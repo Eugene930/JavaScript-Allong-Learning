@@ -9,6 +9,10 @@ const callLast = (fn, rarg) =>
 		return fn.call(this, ...rest, rarg);
 	};
 
+const greet = (me, you) => `Hello, ${you}, my name is ${me}`;
+const heliosSaysHello = callFirst(greet, 'Helios');
+heliosSaysHello('Eatha'); // => "Hello, Eatha, my name is Helios"
+
 const callLeft = (fn, ...args) => (...remainingArgs) =>
 	fn(...args, ...remainingArgs);
 
@@ -30,7 +34,7 @@ const unary = (fn) =>
 // ---------------------------------------
 // ---------------------------------------
 
-// * K Combinator
+// * Tap
 // * always return value, but if u pass it a function, it executes the functino for side-effects.
 const tap = (value) => (fn) => (typeof fn === 'function' && fn(value), value);
 
@@ -177,3 +181,14 @@ const compose = (a, ...rest) =>
 // * another implementation
 const compose = (...fns) => (value) =>
 	fns.reverse().reduce((acc, fn) => fn(acc), value);
+
+// * the semantics of compose: it's eaiser and cleaer to write `double(addOne(3))`===`xx(3)` with `const xx = compose(double, addOne)`
+// ------------------------------------
+// ------------------------------------
+
+// * Pipeline
+const pipeline = (...fns) => (value) => fns.reduce((acc, fn) => fn(acc), value);
+
+const setter = pipeline(addOne, double);
+// ------------------------------------
+// ------------------------------------
