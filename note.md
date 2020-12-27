@@ -254,3 +254,86 @@ p77
 ---
 
 ## Composing and Decomposing Data
+
+p83
+
+-   Array literals are expressions, and arrays are _reference types_. Each time an array literal is evaluated, we get a new, distinct array.
+    ```js
+    [] === undefined; // false
+    ```
+    ```js
+    [] === []; // false
+    ```
+    ```js
+    [2 + 2] === [2 + 2]; // false
+    ```
+    ```js
+    const array_of_one = () => [1];
+    array_of_one() === array_of_one(); // false
+    ```
+-   Self-similarity
+    -   If a list is a self-similar, it's natural to create an algorithm that is also self-similar
+        ```js
+        const length = ([fisrt, ...rest]) =>
+        	first === undefined ? 0 : 1 + length(rest);
+        ```
+
+p92
+
+-   Linear recursion: simpler form of "divide and conquer".
+
+    Dividing a problem into subproblems, detecting terminal cases, solving the terminal cases, and composing a solution from the solved portions.
+
+    -   _Flatten_:
+        terminal case: if an element is :
+
+        1. empty array => will produce an empty array.
+        2. isn't a array, don't flatten it, and put it together with the rest of our solution directly.
+        3. an array, flatten and put it together with the rest.
+
+        ```js
+        const flatten = ([first, ...rest]) => {
+        	if (first === undefined) {
+        		return [];
+        	} else if (!Array.isArray(first)) {
+        		return [first, ...flatten(rest)];
+        	} else {
+        		return [...flatten(first), ...flatten(rest)];
+        	}
+        };
+        ```
+
+p94
+
+-   _mapping_:
+    ```js
+    const mapWith = (fn, [first, ...rest]) => {
+    	first === undefined ? [] : [fn(first), ...mapWith(fn, rest)];
+    };
+    ```
+
+p95
+
+-   _folding_:
+
+    ```js
+    const foldWith = (fn, terminalValue, [first, ...rest]) =>
+    	first === undefined
+    		? terminalValue
+    		: fn(first, foldWith(fn, terminalValue, rest));
+
+    foldWith((number, rest) => number * number + rest, 0, [1, 2, 3, 4, 5]); // => 55
+    ```
+
+    write `mapWith` using `foldWith`:
+
+    ```js
+    const mapWith = (fn, array) =>
+    	foldWith((first, rest) => [fn(first), ...rest], [], array);
+    ```
+
+    write `length` with `foldWith`:
+
+    ```js
+    const length = (array) => foldWith((first, rest) => 1 + rest, 0, array);
+    ```
