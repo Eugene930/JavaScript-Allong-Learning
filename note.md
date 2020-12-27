@@ -337,3 +337,5 @@ p95
     ```js
     const length = (array) => foldWith((first, rest) => 1 + rest, 0, array);
     ```
+
+    white folding is a special case of linear recursion, mapping is a special case of folding.
