@@ -89,12 +89,12 @@ p61
 
 -   Partial Application
 
-        ```js
-        const callFirst = (fn, larg) =>
-        	function (...rest) {
-        		return fn.call(this, larg, ...rest);
-        	};
-        ```
+    ```js
+    const callFirst = (fn, larg) =>
+    	function (...rest) {
+    		return fn.call(this, larg, ...rest);
+    	};
+    ```
 
 p59
 
@@ -223,7 +223,7 @@ p71
 
         ```js
         const compose = (...fns) => (value) =>
-        	fns.reduce((acc, fn) => fn(acc), value);
+        	fns.reverse().reduce((acc, fn) => fn(acc), value);
         ```
 
 p73
