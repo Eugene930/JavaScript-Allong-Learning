@@ -342,98 +342,178 @@ p95
 
 p97
 
-- Tail Calls
+-   Tail Calls
 
     The `mapWith` and `foldWith` functions we wrote previously are not "production-ready". One of the reasons is that they consume memory propotional to the size of the array being fold.
 
-    Better way: *tail-call optimization*, or "TCO"
+    Better way: _tail-call optimization_, or "TCO"
 
     > a "tail-call" occurs when a function's last act is to invoke another function, and then return whatever the other function reutrns.
-    
+
     > **If a function makes a call in tail position, JavaScript optimizes away the function call overhead and stack space.**
 
     The `length` function below is not a tail-call, because it return `1 + length(rest)`, not `length(rest)`
+
     ```js
-    const length = ([first, ...rest]) => 
-        first === undefined ? 0 : 1 + length(rest)
+    const length = ([first, ...rest]) =>
+    	first === undefined ? 0 : 1 + length(rest);
     ```
 
 p100
 
-- Converting non-tail-calls to tail-calls
+-   Converting non-tail-calls to tail-calls
+
     ```js
-    const lengthDelaysWork = ([first, ...rest], numberToBeAdded) => 
-        first === undefined 
-            ? numberToBeAdded 
-            : lengthDelaysWork(rest, 1 + numberToBeAddde)
-    
-    const length = (n) => 
-        lengthDelaysWork(n, 0)
+    const lengthDelaysWork = ([first, ...rest], numberToBeAdded) =>
+    	first === undefined
+    		? numberToBeAdded
+    		: lengthDelaysWork(rest, 1 + numberToBeAddde);
+
+    const length = (n) => lengthDelaysWork(n, 0);
     ```
+
     Or we could use partial application:
+
     ```js
-    const callLast = (fn, ...args) => 
-        (...remainingArgs) =>
-            fn(...remainingArgs, ...args)
-    
-    const length = callLast(lengthDelaysWork, 0)
+    const callLast = (fn, ...args) => (...remainingArgs) =>
+    	fn(...remainingArgs, ...args);
+
+    const length = callLast(lengthDelaysWork, 0);
     ```
 
     JavaScript optimizes that not to take up memory proportional to the length of the string ,We could use this technique with `mapWith`
+
     ```js
-    const mapWithDelayWork = (fn, [first, ...rest], prepend) => 
-        first === undefined
-            ? prepend
-            : mapWithDelayWork(fn, rest, [...prepend, fn(first)])
-    
-    const mapWith = callLast(mapWithDelayWork, [])
+    const mapWithDelayWork = (fn, [first, ...rest], prepend) =>
+    	first === undefined
+    		? prepend
+    		: mapWithDelayWork(fn, rest, [...prepend, fn(first)]);
+
+    const mapWith = callLast(mapWithDelayWork, []);
     ```
 
 p102
 
-- Default arugments
+-   Default arugments
 
-    - Factorials
+    -   Factorials
+
         ```js
         const factorialWithDelayWork = (n, work) =>
-            n === 1
-            ? work
-            : factorialWithDelayWork(n - 1, n * work)
+        	n === 1 ? work : factorialWithDelayWork(n - 1, n * work);
 
-        factorialWithDelayWork(1, 1) // => 1
-        
-        factorialWithDelayWork(5, 1) // => 120
+        factorialWithDelayWork(1, 1); // => 1
+
+        factorialWithDelayWork(5, 1); // => 120
         ```
-    - use *default argument*
+
+    -   use _default argument_
         ```js
-        const factorial = (n, work = 1) => 
-            n === 1 
-            ? work
-            : factorial(n - 1, n * work)
+        const factorial = (n, work = 1) =>
+        	n === 1 ? work : factorial(n - 1, n * work);
         ```
-    - default desctructring
+    -   default desctructring
         ```js
-        const [first, second = "two"] = ["one"]
+        const [first, second = 'two'] = ['one'];
         ```
-    
+
 p105
 
-- Garbage, Garbage Everywhere
-    
+-   Garbage, Garbage Everywhere
+
     The `mapWith` with tail-calls is still very slow on very large arrays.
 
     **Key Point**: Our `[first, ...rest]` approach to recursion is slow because that it creates a lot of temporary arrays, and it spends an enormous amount of time copying elements into arrays that end up being discarded.
 
     Linked lists are fast for a few things, like taking the front off a list, and taking the remainder of a list. But not for iterating over a list. (It's fast to iterate **forward** through a linked list, but linked list are constructed back-to-front.)
 
-
 p111
 
-- Plain Old JavaScript Objects
+-   Plain Old JavaScript Objects
 
     Two objects created with separate evaluations have differing identities:
+
     ```js
     {year: 2012, month: 6, day: 14} === {year: 2012, month: 6, day: 14}
     // => false
     ```
+
     Names needn't be alphanumeric strings, for anything else, enclose the label in quotes.
+
+p117
+
+-   linked list are constructed back-to-front.
+
+    naively copying (front-to-back):
+
+    ```js
+    const slowcopy = (node) =>
+    	node === EMPTY ? EMPTY : {first: node.first, rest: slowcopy(node.rest)};
+    ```
+
+    reverse the list (back-to-front):
+
+    ```js
+    const reverse = (node, delayed = EMPTY) =>
+    	node === EMPTY
+    		? delayed
+    		: reverse(node.rest, {first: node.first, rest: delayed});
+    ```
+
+    reversing map:
+
+    ```js
+    const reverseMapWith = (fn, node, delayed = EMPTY) =>
+    	node === EMPTY
+    		? delayed
+    		: reverseMapWith(fn, node.rest, {
+    				first: fn(node.first),
+    				rest: delayed,
+    		  });
+    ```
+
+    and a regular mapWith follows:(take as twice as long as a straight iteration)
+
+    ```js
+    const mapWith = (fn, node, delayed = EMPTY) =>
+    	node === EMPTY
+    		? reverse(delayed)
+    		: mapWith(fn, node.rest, {first: fn(node.first, (rest: delayed))});
+    ```
+
+    This is still much faster than making partial copies of arrays.(we aren't making a new list, but getting a reference.)
+
+p120
+
+-   Mutation
+    nothing happend cause we just rebind the name within innter environment:
+
+    ```js
+    const allHallowsEve = [2012, 10, 31];
+    (function (halloween) {
+    	halloween = [2013, 10, 31];
+    })(allHallowsEve);
+    allHallowsEve; // => [2012, 10, 32]
+    ```
+
+    However, what happends if we _mutate_ the value in the inner environment?
+
+    ```js
+    const allHallowsEve = [2012, 10, 31];
+    (function (halloween) {
+    	halloween[0] = 2013;
+    })(allHallowsEve);
+    allHallowsEve; // => [2013, 10, 31]
+    ```
+
+    In general, mutation makes some algorithms shorter to write and possibly faster, but harder to reason about.
+
+    The gathering operation is slower, but "safer".
+
+    We just use the data, and the less we mutate it, the fewer the times we have to think about whether making changes will be "safe".
+
+p128
+
+-   `let` works like `const`, but permits us to rebind variables.
+
+    we should always declare and bind names before using them. JavaScript hoists the declaration, but not the assignment.
