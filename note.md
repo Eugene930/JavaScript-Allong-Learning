@@ -339,3 +339,101 @@ p95
     ```
 
     white folding is a special case of linear recursion, mapping is a special case of folding.
+
+p97
+
+- Tail Calls
+
+    The `mapWith` and `foldWith` functions we wrote previously are not "production-ready". One of the reasons is that they consume memory propotional to the size of the array being fold.
+
+    Better way: *tail-call optimization*, or "TCO"
+
+    > a "tail-call" occurs when a function's last act is to invoke another function, and then return whatever the other function reutrns.
+    
+    > **If a function makes a call in tail position, JavaScript optimizes away the function call overhead and stack space.**
+
+    The `length` function below is not a tail-call, because it return `1 + length(rest)`, not `length(rest)`
+    ```js
+    const length = ([first, ...rest]) => 
+        first === undefined ? 0 : 1 + length(rest)
+    ```
+
+p100
+
+- Converting non-tail-calls to tail-calls
+    ```js
+    const lengthDelaysWork = ([first, ...rest], numberToBeAdded) => 
+        first === undefined 
+            ? numberToBeAdded 
+            : lengthDelaysWork(rest, 1 + numberToBeAddde)
+    
+    const length = (n) => 
+        lengthDelaysWork(n, 0)
+    ```
+    Or we could use partial application:
+    ```js
+    const callLast = (fn, ...args) => 
+        (...remainingArgs) =>
+            fn(...remainingArgs, ...args)
+    
+    const length = callLast(lengthDelaysWork, 0)
+    ```
+
+    JavaScript optimizes that not to take up memory proportional to the length of the string ,We could use this technique with `mapWith`
+    ```js
+    const mapWithDelayWork = (fn, [first, ...rest], prepend) => 
+        first === undefined
+            ? prepend
+            : mapWithDelayWork(fn, rest, [...prepend, fn(first)])
+    
+    const mapWith = callLast(mapWithDelayWork, [])
+    ```
+
+p102
+
+- Default arugments
+
+    - Factorials
+        ```js
+        const factorialWithDelayWork = (n, work) =>
+            n === 1
+            ? work
+            : factorialWithDelayWork(n - 1, n * work)
+
+        factorialWithDelayWork(1, 1) // => 1
+        
+        factorialWithDelayWork(5, 1) // => 120
+        ```
+    - use *default argument*
+        ```js
+        const factorial = (n, work = 1) => 
+            n === 1 
+            ? work
+            : factorial(n - 1, n * work)
+        ```
+    - default desctructring
+        ```js
+        const [first, second = "two"] = ["one"]
+        ```
+    
+p105
+
+- Garbage, Garbage Everywhere
+    
+    The `mapWith` with tail-calls is still very slow on very large arrays.
+
+    **Key Point**: Our `[first, ...rest]` approach to recursion is slow because that it creates a lot of temporary arrays, and it spends an enormous amount of time copying elements into arrays that end up being discarded.
+
+    Linked lists are fast for a few things, like taking the front off a list, and taking the remainder of a list. But not for iterating over a list. (It's fast to iterate **forward** through a linked list, but linked list are constructed back-to-front.)
+
+
+p111
+
+- Plain Old JavaScript Objects
+
+    Two objects created with separate evaluations have differing identities:
+    ```js
+    {year: 2012, month: 6, day: 14} === {year: 2012, month: 6, day: 14}
+    // => false
+    ```
+    Names needn't be alphanumeric strings, for anything else, enclose the label in quotes.
