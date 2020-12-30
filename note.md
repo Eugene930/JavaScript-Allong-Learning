@@ -729,3 +729,411 @@ p146
     ```
 
     We've separated the knowledge of how to sum from the knowledge of how to fold an array or tree(or anything else, really).
+
+p148
+
+-   Iterating
+
+    We can accomplish any task with folds that could be accmplished with that stalwart of structured programming.
+
+    Nevertheless, there's some value in being able to express some algorithm as iteration.
+
+    low-level version of `for` loop, summing the elements of an array can be accomplished with:
+
+    ```js
+    const arraySum = (array) => {
+    	let sum = 0;
+
+    	for (let i = 0; i < array.length; ++i) {
+    		sum += array[i];
+    	}
+    	return sum;
+    };
+
+    arraySum([1, 4, 9, 16, 25]); // => 55
+    ```
+
+    Once again, we're mixing the code for iterating over an array with the code for calculating a sum, and worst of all, we're getting really low-level with details.
+
+    We can write this a slightly different way, using a while loop:
+
+    ```js
+    const arraySum = (array) => {
+    	let done,
+    		sum = 0,
+    		i = 0;
+
+    	while (((done = i == array.length), !done)) {
+    		const value = array[i++];
+    		sum += value;
+    	}
+    	return sum;
+    };
+    arraySum([1, 4, 9, 16, 25]); // => 55
+    ```
+
+    We can put `done` and `value` into POJO(plain old javascript object):
+
+    ```js
+    const arraySum = (array) => {
+    	let iter,
+    		sum = 0,
+    		index = 0;
+
+    	while (
+    		((eachIteration = {
+    			done: index === array.length,
+    			value: index < array.length ? array[index] : undefined,
+    		}),
+    		++index,
+    		!eachIteration.done)
+    	) {
+    		sum += eachIteration.value;
+    	}
+    	return sum;
+    };
+
+    arraySum([1, 4, 9, 16, 25]); // => 55
+    ```
+
+    we make a POJO that has `done` and `value`, all the summing code needs to know is add `eachIteration.value`, Now we can extract the ickiness into a separate function:
+
+    ```js
+    const arrayIterator = (array) => {
+    	let i = 0;
+
+    	return () => {
+    		const done = i === array.length;
+
+    		return {
+    			done,
+    			value: done ? undefined : array[i++],
+    		};
+    	};
+    };
+
+    const iteratorSum = (iterator) => {
+    	let eachIteration,
+    		sum = 0;
+
+    	while (((eachIteration = iterator()), !eachIteration.done)) {
+    		sum += eachIetration.value;
+    	}
+    	return sum;
+    };
+
+    iteratorSum(arrayIterator([1, 4, 9, 16, 25])); // => 55
+    ```
+
+    Here's one for linked lists:
+
+    ```js
+    const EMPTY = null;
+
+    const isEmpty = (node) => node === EMPTY;
+
+    const pair = (first, rest = EMPTY) => ({first, rest});
+
+    const list = (...elements) => {
+    	const [first, ...rest] = elements;
+
+    	return elements.length === 0 ? EMPTY : pair(first, list(...rest));
+    };
+
+    const print = (aPair) =>
+    	isEmpty(aPair) ? '' : `${aPair.first} ${print(aPair.rest)}`;
+
+    const listIterator = (aPair) => () => {
+    	const done = isEmpty(aPair);
+    	if (done) {
+    		return {done};
+    	} else {
+    		const {first, rest} = aPair;
+
+    		aPair = aPair.rest;
+    		return {done, value: first};
+    	}
+    };
+
+    const iteratorSum = (iterator) => {
+    	let eachIterationm;
+    	sum = 0;
+
+    	while (((eachIteration = iterator()), !eachIteration.done)) {
+    		sum += eachIteration.value;
+    	}
+    	return sum;
+    };
+
+    iteratorSum(listIterator(list(1, 4, 9, 16, 25)));
+    ```
+
+p151
+
+-   unfolding and laziness
+
+    A function that starts with a seed and expands it into a data structure is called an _unfold_
+
+    For starter, we can `map` an iterator:
+
+    ```js
+    const mapIteratorWith = (fn, iterator) => () => {
+    	const {done, value} = iterator();
+
+    	return {done, value: done ? undefined : fn(value)};
+    };
+    const squares = mapIteratorWith((x) => x * x, NumberIterator(1));
+
+    squares().value; // => 1
+    squares().value; // => 4
+    ```
+
+    here's another one:
+
+    ```js
+    const FibonacciIterator = () => {
+    	let previous = 0,
+    		current = 1;
+
+    	return () => {
+    		const value = current;
+
+    		[previous, current] = [current, current + previous];
+    		return {done: false, value};
+    	};
+    };
+    const fib = FibonacciIterator();
+    fib().value; // => 1
+    fib().value; // => 2
+    ```
+
+    going on forever has some drawbacks. let's introduce an idea: a function that takes an iterator and returns another iterator.
+
+    ```js
+    const take = (iterator, numberToTake) => {
+    	let count = 0;
+
+    	return () => {
+    		if (++count <= numberToTake) {
+    			return iterator();
+    		} else {
+    			return {done: true};
+    		}
+    	};
+    };
+
+    const toArray = (iterator) => {
+    	let eachIteration,
+    		array = [];
+
+    	while (((eachIteration = iterator()), !eachIteration.done)) {
+    		array.push(eachIteration.value);
+    	}
+    	return array;
+    };
+    toArray(take(FibonacciIterator(), 5));
+    // => [1, 1, 2, 3, 5]
+
+    toArray(take(squares, 5));
+    // => [1, 4, 9, 16, 25]
+    ```
+
+    how about the squares of the first five odd numbers
+
+    ```js
+    const odds = () => {
+    	let number = 1;
+
+    	return () => {
+    		const value = number;
+
+    		number += 2;
+    		return {
+    			done: false,
+    			value,
+    		};
+    	};
+    };
+
+    const squareOf = callLeft(mapIteratorWith, (x) => x * x);
+
+    toArray(take(squareOf(odds()), 5));
+    // => [1, 9, 25, 49, 81]
+    ```
+
+    we could also write a filter for iterators to accompany our mapping function:
+
+    ```js
+    const filterIteratorWith = (fn, iterator) => () => {
+    	do {
+    		const {done, value} = iterator();
+    	} while (!done && !fn(value));
+    	return {done, value};
+    };
+
+    const oddsOf = callLeft(filterIteratorWith, (n) => n % 2 === 1);
+    toArray(take(squareOf(oddsOf(NumberIterator(1))), 5));
+    // => [1, 9, 25, 49, 81]
+    ```
+
+    filter:
+
+    ```js
+    const firstInIteration = (fn, iterator) =>
+    	take(filterIteratorWith(fn, iterator), 1);
+    ```
+
+    This is interesting because it's lazy, doesn't apply `fn` to every element in an iteration. Whereas if we wrote something like:
+
+    ```js
+    const firstInArray = (fn, array) => array.filter(fn)[0];
+    ```
+
+    Javascript would apply `fn` to every element.
+
+p156
+
+-   Making Data out of function
+
+    Arbitrary computations could be represented a small set of axiomatic components. For example, we don't need arrays to represent lists, or even POJOs to represent nodes in a linked list.
+
+    Let's start with some of the building blocks of combinatory logic, the K, I and V combinators, nicknamed the 'Kestrel', the 'Idiot Bird', and the 'Vireo'
+
+    ```js
+    const K = (x) => (y) => x;
+    const I = (x) => x;
+    const V = (x) => (y) => (z) => z(x)(y);
+    ```
+
+-   The kestrel and the idiot
+
+    A _constant_ function is a function that always returns the same thing, no matter what you give it.
+
+    The kestrel, or K, is a function that makes constant functions. You give it a value, and it returns function that gives that value.
+
+    ```js
+    const K = (x) => (y) => x;
+
+    const fortyTwo = K(42);
+    fortyTwo(6); // => 42
+    fortyTwo('hello'); // => 42
+
+    K(6)(7); // => 6
+    K(12)(24); // => 12
+    ```
+
+    The _identity_ function evaluates to whatever parameter you pass it. so `I(42) => 42`
+
+    ```js
+    K(I)(6)(7); // => 7
+    K(I)(12)(24); // => 24
+
+    const first = K,
+    	second = K(I);
+
+    first('primus')('secundus'); // => primus
+    second('primus')('secundus'); // => secundus
+    ```
+
+-   backwardness
+
+    ```js
+    const latin = (selector) => selector('primus')('secundus');
+
+    latin(first); // => 'primus'
+    latin(second); // => 'secundus'
+    ```
+
+    latin is no longer a dumb data structure, it's a function, and it's exactly _backwards_ of the way we write functions that operatre on data.
+
+-   the vireo
+
+    ```js
+    const first = K,
+    	second = K(I),
+    	pair = V;
+    const latin = pair('primus')('secundus');
+
+    latin(first); // => "primus"
+    latin(second); // => "secundus"
+    ```
+
+p162
+
+-   Lists with functions as data
+    another look at linked list using POJOs
+
+    ```js
+    const first = ({first, rest}) => first,
+    	rest = ({first, rest}) => rest,
+    	pair = (first, rest) => ({first, rest}),
+    	EMPTY = {};
+
+    const l123 = pair(1, pair(2, pair(3, EMPTY)));
+
+    first(l123); // => 1
+    first(rest(l123)); // => 2
+    first(rest(rest(l123))); // => 3
+    ```
+
+    we can write `length` and `mapWith` function over it:
+
+    ```js
+    const length = (aPair) => (aPair === EMPTY ? 0 : 1 + length(rest(aPair)));
+    length(l123); // => 3
+
+    const reverse = (aPair, delayed = EMPTY) =>
+    	aPair === EMPTY
+    		? delayed
+    		: reverse(rest(aPair), pair(first(aPair), delayed));
+    const mapWith = (fn, aPair, delayed = EMPTY) =>
+    	aPair === EMPTY
+    		? reverse(delayed)
+    		: mapWith(fn, rest(aPair), pair(fn(first(aPair)), delayed));
+    const doubled = mapWith((x) => x * 2, l123);
+    ```
+
+    Can we do the same with the linked lists we build out of functions ? Yes:
+
+    ```js
+    const first = K,
+    	rest = K(I),
+    	pair = V,
+    	EMPTY = () => {};
+    const l123 = pair(1)(pair(2)(pair(3)(EMPTY)));
+
+    l123(first); // => 1
+    l123(rest)(first); // => 2
+    l123(rest)(rest)(first); // => 3
+    ```
+
+    we write them in a backwards way, but they seem to work. How about `length`?
+
+    ```js
+    const length = (aPair) => (aPair === EMPTY ? 0 : 1 + length(aPair(rest)));
+    length(l123); // => 3
+    ```
+
+    And mapWith?
+
+    ```js
+    const reverse = (aPair, delayed = EMPTY) =>
+    	aPair === EMPTY
+    		? delayed
+    		: reverse(aPair(rest), pair(aPair(first))(delayed));
+    const mapWith = (fn, aPair, delayed = EMPTY) =>
+    	aPair === EMPTY
+    		? reverse(delayed)
+    		: mapWith(fn, aPair(rest), pair(fn(aPair(first)))(delayed));
+    const doubled = mapWith((x) => x * 2, l123);
+
+    doubled(first); // => 2
+    doubled(rest)(first); // => 4
+    doubled(rest)(rest)(first); // => 6
+    ```
+
+    Presto, **we can use pure functions to represent a linked list.** In fact, anything that can be computed can be computed using just functions and nothing else.
+
+p165
+
+-   Say "please"
