@@ -5,7 +5,7 @@
     -   [Composing and Decomposing Data](#Composing-and-Decomposing-Data)
     -   [Recipes with Data](#Recipes-with-Data)
     -   [Basic Strings and Quasi-Literals](#Basic-Strings-and-Quasi-Literals)
-    -   [Objects and State]()
+    -   [Objects and State](#Objects-and-State)
     -   [Recipes with Obejects Mutations, and State]()
     -   [Object-Oriented Programing]()
     -   [Collections]()
@@ -1252,6 +1252,8 @@ so what's interesting about this? what nags at our brain as we're falling asleep
     -   Instead of directly manipulating part of an entity, pass it a function and have it call our function with the part we want.
     -   And instead of testing some property of an entity and making a choice of our own with `?:`(or `if`), pass the entity the work we want done for each case and let it test itself.
 
+---
+
 ## Recipes with Data
 
 p172
@@ -1406,4 +1408,471 @@ p180
 
     Another tip: Change some of the fat arrow functions inside of it into named function expression to help you decipher stack traces.
 
+---
+
 ## Basic Strings and Quasi-Literals
+
+p182
+
+-   quasi-literals
+
+    JavaScript supports _quasi-literal_ strings, a/k/a "Template Strings" or "String Interpolation Expressions". A quasi-literal string is something that looks like a string literal, but is actually an expression.
+
+-   evaluation time
+
+    Like any other expression, quasi-literals are evaluated _late_.
+
+    ```js
+    const greeting = (name) => `Hello my name is ${name}`;
+    ```
+
+---
+
+## Objects and State
+
+We have avoid objects that are meant to be changed, objects that model state. It's time to change _everything_.
+
+p185
+
+-   Encapsulating State with Closures
+
+    > OOP to me means only messaging, local retention and protection and hiding of state-process, and extreme late-binding of all things. -- [Alan Kay](http://userpage.fu-berlin.de/~ram/pub/pub_jf47ht81Ht/doc_kay_oop_en)
+
+-   what is hiding of state-process, and why does it matter?
+
+    > In computer science, information hiding is the principle of segregation of the design decisions in a computer program that are most likely to change, thus protecting other parts of the program from extensive modification if the design decision is changed. The protection involves providing a stable interface which protects the remainder of the program from the implementation(the details that are most likely to change).
+    >
+    > Written another way, information hiding is the ability to prevent certain aspects of a class of software component from being accessible to its clients, using either programming language features(like private variables) or an explicit exporting policy.
+    >
+    > -- [Wikipedia](https://en.wikipedia.org/wiki/Information_hiding)
+
+    Only expose the oprations we have deemed stable.
+
+    Hiding information(or "state") is the design principle that allows us to limit the coupling between components of software.
+
+p186
+
+-   how do we hide state using javascript?
+
+    ```js
+    const stack = (() => {
+    	const obj = {
+    		array: [],
+    		index: -1,
+    		push(value) {
+    			return (obj.array[(obj.index += 1)] = value);
+    		},
+    		pop() {
+    			const value = obj.array[obj.index];
+
+    			obj.array[obj.index] = undefined;
+    			if (obj.index >= 0) {
+    				obj.index -= 1;
+    			}
+    			return value;
+    		},
+    		isEmpty() {
+    			return obj.index < 0;
+    		},
+    	};
+
+    	return obj;
+    })();
+
+    state.isEmpty(); // true
+    state.push('hello'); // 'hello'
+    state.push('js'); // 'js'
+    state.isEmpty(); // false
+    state.pop(); // 'js'
+    state.pop(); // 'hello'
+    state.isEmpty(); // true
+    ```
+
+p187
+
+-   method-ology
+
+    In JavaScript every method is a functino, but not all functions are methods.
+
+    A function is a method of an object if it belongs to that object and iteracts with that object in some way.
+
+    these two wouldn't be methods, although they "belong" to an object, they don't interact with it:
+
+    ```js
+    {
+    	min: (x, y) => (x < y ? x : y),
+    	max: (x, y) => (x > y ? x : y)
+    }
+    ```
+
+-   hiding state
+
+    Our `stack` does bundle functions with data, but it doesn't hide its state. "Foreign" code could interfere with its array or index.
+
+    How do we hide these ? We already have a closure, let's use it:
+
+    ```js
+    const stack = (() => {
+    	let array = [],
+    		index = -1;
+
+    	const obj = {
+    		push(value) {
+    			return (array[(index += 1)] = value);
+    		},
+    		pop() {
+    			const value = array[index];
+
+    			array[index] = undefined;
+    			if (index >= 0) {
+    				index -= 1;
+    			}
+    			return value;
+    		},
+    		isEmpty() {
+    			return index < 0;
+    		},
+    	};
+
+    	return obj;
+    })();
+    ```
+
+    We don't want to repeat this code every time we want a stack, so let's make ourselves a "stack maker".
+
+    ```js
+    const Stack = () => {
+    	let array = [],
+    		index = -1;
+
+    	return {
+    		push(value) {
+    			return (array[(index += 1)] = value);
+    		},
+    		pop() {
+    			const value = array[index];
+
+    			array[index] = undefined;
+    			if (index >= 0) {
+    				index -= 1;
+    			}
+    			return value;
+    		},
+    		isEmpty() {
+    			return index < 0;
+    		},
+    	};
+    };
+    const stack = Stack();
+    stack.push('Hello');
+    stack.push('Good bye');
+
+    stack.pop(); // 'Good bye'
+    stack.pop(); // 'Hello'
+    ```
+
+    **is encapsulation "object-oriented"?**
+
+    We've built something with hidden internal state and "methods", all without needing special `def` or `private` keywords. Mind you, we haven't included all sorts of complicated mechanisms to support inheritance, mixins, and other opportunities for debating the nature of the One True Object-Oriented Style on the Internet.
+
+    Again, the key lesson experienced programmers repeat, although it often falls on deaf ears is [Composition instead of Inheritance](http://wiki.c2.com/?CompositionInsteadOfInheritance)
+
+p192
+
+-   Composition and Extension
+
+-   composition
+
+    The choice of how to divide a component into smaller components is called _factoring_.
+
+    Here's an abstract "model" that supports undo and redo composed from a pair of stacks, and a POJO:
+
+    We can `set` and `get` attributes in a model
+
+    ```js
+    // helper function
+
+    // For production use, consider what to do about
+    // deep copies and own keys
+    const shallowCopy = (source) => {
+    	const dest = {};
+
+    	for (let key in source) {
+    		dest[key] = source[key];
+    	}
+    	return dest;
+    };
+
+    const Stack = () => {
+    	const array = [];
+    	let index = -1;
+
+    	return {
+    		push(value) {
+    			return (array[(index += 1)] = value);
+    		},
+    		pop() {
+    			const value = array[index];
+
+    			array[index] = undefined;
+    			if (index >= 0) {
+    				index -= 1;
+    			}
+    			return value;
+    		},
+    		isEmpty() {
+    			return index < 0;
+    		},
+    	};
+    };
+
+    const Model = function (initialAttributes) {
+    	const redoStack = Stack();
+    	let attributes = shallowCopy(initialAttributes || {});
+
+    	const undoStack = Stack(),
+    		obj = {
+    			set: (attrsToSet) => {
+    				undoStack.push(shallowCopy(attributes));
+    				if (!redoStack.isEmpty()) {
+    					redoStack.length = 0;
+    				}
+    				for (let key in attrsToSet || {}) {
+    					attributes[key] = attrsToSet[key];
+    				}
+    				return obj;
+    			},
+    			undo: () => {
+    				if (!undoStack.isEmpty()) {
+    					redoStack.push(shallowCopy(attributes));
+    					attributes = undoStack.pop();
+    				}
+    				return obj;
+    			},
+    			redo: () => {
+    				if (!redoStack.isEmpty()) {
+    					undoStack.push(shallowCopy(attributes));
+    					attributes = redoStack.pop();
+    				}
+    				return obj;
+    			},
+    			get: (key) => attributes[key],
+    			has: (key) => attributes.hasOwnProperty(key),
+    			attributes: () => shallowCopy(attributes),
+    		};
+    	return obj;
+    };
+
+    const model = Model();
+    model.set({Doctor: 'de Grasse'});
+    model.set({Doctor: 'who'});
+    model.undo();
+    model.get('Doctor'); // => "de Grasse"
+    ```
+
+    (注："The opposite of undo is Redo. The redo command reverses the undo or advances the buffer to a more recent state."[Undo - Wikipedia](https://en.wikipedia.org/wiki/Undo#Undo_and_redo_models))
+
+-   extension
+
+    Consider a queue
+
+    ```js
+    const Queue = () => {
+    	let array = [],
+    		head = 0,
+    		tail = -1;
+
+    	return {
+    		pushTail: (value) => (array[++tail] = value),
+    		pullHead: () => {
+    			if (tail >= head) {
+    				const value = array[head];
+
+    				array[head] = undefined;
+    				++head;
+    				return value;
+    			}
+    		},
+    		isEmpty: () => tail < head,
+    	};
+    };
+
+    const queue = Queue();
+    queue.pushTail('Hello');
+    queue.pushTail('JavaScript');
+    queue.pushTail('Allonge');
+
+    queue.pullHead(); // => "hello"
+    queue.pullHead(); // => "JavaScript"
+    ```
+
+    Now we wish to create a deque by adding `pullTail` and `pushHead` operations to our queue. Unfortunately, encapsulation prevents us from adding operations that interact with the hidden data structures.
+
+    This isn't really surprising: The entire point of encapsulation is to create an opaque data structure that can only be manipulated through its public interface. The design goals of encapsulation and extension are always going to exist in tension.
+
+    Let's de-encapsulate our queue:
+
+    ```js
+    const Queue = function () {
+    	const queue = {
+    		array: [],
+    		head: 0,
+    		tail: -1,
+    		pushTail: (value) => (queue.array[++queue.tail] = value),
+    		pullHead: () => {
+    			if (queue.tail > queue.head) {
+    				const value = queue.array[queue.head];
+
+    				queue.array[queue.head] = undefined;
+    				queue.head += 1;
+    				return value;
+    			}
+    		},
+    		isEmpty: () => queue.tail < queue.head,
+    	};
+    	return queue;
+    };
+    ```
+
+    Now we can extend a queue into a deque:(注：下面的代码应该是有问题)
+
+    ```js
+    const extend = function (consumer, ...providers) {
+    	for (let i = 0; i < providers.length; ++i) {
+    		const provider = providers[i];
+    		for (let key in provider) {
+    			if (provider.hasOwnProperty(key)) {
+    				consumer[key] = provider[key];
+    			}
+    		}
+    	}
+    	return consumer;
+    };
+
+    const Dequeue = function () {
+    	const deque = Queue(),
+    		INCREMENT = 4;
+
+    	return Object.assgin(deque, {
+    		size: () => deque.tail - deque.head + 1,
+    		pullTail: () => {
+    			if (!deque.isEmpty()) {
+    				const value = deque.array[deque.tail];
+
+    				deque.array[deque.tail] = undefined;
+    				deque.tail -= 1;
+    				return value;
+    			}
+    		},
+    		pushHead: (value) => {
+    			if (deque.head === 0) {
+    				for (let i = deque.tail; i <= deque.head; i++) {
+    					deque.array[i + INCREMENT] = deque.array[i];
+    				}
+    				deque.tail += INCREMENT;
+    				deque.head += INCREMENT;
+    			}
+    			return (deque.array[(deque.head -= 1)] = value);
+    		},
+    	});
+    };
+    ```
+
+p198
+
+-   This and That
+
+    Let's take another look at extensible objects.
+
+    ```js
+    const Queue = () => {
+    	const queue = {
+    		array: [],
+    		head: 0,
+    		tail: -1,
+    		pushTail(value) {
+    			return (queue.array[++queue.tail] = value);
+    		},
+    		pullHead() {
+    			if (queue.tail >= queue.head) {
+    				const value = queue.array[queue.head];
+
+    				queue.array[queue.head] = undefined;
+    				queue.head += 1;
+    				return value;
+    			}
+    		},
+    		isEmpty() {
+    			return queue.tail < queue.head;
+    		},
+    	};
+    	return queue;
+    };
+    const queue = Queue();
+    queue.pushTail('Hello');
+    queue.pushTail('JavaScript');
+    ```
+
+    Let's make a copy of our queue using `Object.assign`:
+
+    ```js
+    const copyOfQueue = Object.assign({}, queue);
+
+    queue !== copyOfQueue; // => true
+    ```
+
+    Wait a second, it probably copied a reference to the original array, let' make a copy of the array as well
+
+    ```js
+    copyOfQueue.array = [];
+    for (let i = 0; i < 2; i++) {
+    	copyOfQueue.array[i] = queue.array[i];
+    }
+    ```
+
+    Now let's pull the head off the original
+
+    ```js
+    queue.pullHead(); // => 'Hello'
+    copyOfQueue.pullHead(); // => 'JavaScript'
+    ```
+
+    What ? The problem is that while we've carefully copied our array and other elements over, _the closures all share the same environment_, and therefore the function in `copyOfQueue` all operate on the first queue's private data, not on the copies.
+
+    > This is a general issue with closures. Closures couple functions to environments, and that makes them very elegant in the small, and very handy for making opaque data structures. Alas, their strength in the small is their weakness in the large. When you're trying to make reusable components, this coupling is sometimes a hindrance.
+
+    Let's take an impossibly optimistic fight of fancy:
+
+    ```js
+    const AmnesiacQueue = () => ({
+    	array: [],
+    	head: 0,
+    	tail: -1,
+    	pushTail(myself, value) {
+    		return (myself.array[(myself.tail += 1)] = value);
+    	},
+    	pullHead(myself) {
+    		if (myself.tail >= myself.head) {
+    			let value = myself.array[myself.head];
+    			myself.array[myself.head] = void 0;
+    			myself.head += 1;
+    			return value;
+    		}
+    	},
+    	isEmpty(myself) {
+    		return myself.tail < myself.head;
+    	},
+    });
+
+    const queueWithAmnesia = AmnesiacQueue();
+
+    queueWithAmnesia.pushTail(queueWithAmnesia, 'Hello');
+    queueWithAmnesia.pushTail(queueWithAmnesia, 'JavaScript');
+    queueWithAmnesia.pullHead(queueWithAmnesia); // => 'Hello'
+    ```
+
+    The killer drawback, of course, is making sure we are always passing the correct queue in every time we invoke a function.
+
+p200
+
+-   what's all this ?
