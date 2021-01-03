@@ -6,7 +6,7 @@
     -   [Recipes with Data](#Recipes-with-Data)
     -   [Basic Strings and Quasi-Literals](#Basic-Strings-and-Quasi-Literals)
     -   [Objects and State](#Objects-and-State)
-    -   [Recipes with Obejects Mutations, and State]()
+    -   [Recipes with Obejects Mutations, and State](#Recipes-with-Obejects-Mutations,-and-State)
     -   [Object-Oriented Programing]()
     -   [Collections]()
     -   [Symbols]()
@@ -1875,4 +1875,452 @@ p198
 
 p200
 
--   what's all this ?
+-   what's all `this` ?
+
+    We'll remove `myself` fron the parameter, and rename it to `this` withnin the body of each function:
+
+    ```js
+    const BetterQueue = () => ({
+    	array: [],
+    	head: 0,
+    	tail: -1,
+    	pushTail(value) {
+    		return (this.array[(this.tail += 1)] = value);
+    	},
+    	pullHead() {
+    		if (this.tail >= this.head) {
+    			let value = this.array[this.head];
+
+    			this.array[this.head] = undefined;
+    			this.head += 1;
+    			return value;
+    		}
+    	},
+    	isEmpty() {
+    		return this.tail < this.head;
+    	},
+    });
+    ```
+
+P203
+
+-   What Context Applies When We Call a Function?
+
+    ```js
+    const someObject = {
+    	returnMyThis() {
+    		return this;
+    	},
+    };
+
+    someObject.returnMyThis() === someObject; // => true
+    ```
+
+-   it's all about the way the function is called
+
+    The important thing to understand is that the context for a function being called is set by the way the function is called, not the function itself.
+
+    A function's context cannot be determined by examining the source code of a JavaScript program. Let's look at the example again:
+
+    ```js
+    const someObject = {
+    	someFunction() {
+    		return this;
+    	},
+    };
+    someObject.someFunction() === someObject; // => true
+    ```
+
+    What's the context of `someObject.someFunction` ? Don't say `someObject`! Watch this:
+
+    ```js
+    const someFunction = someObject.someFunction;
+
+    someFunction === someObject.someFunction; // => true
+    someFunction() === someObject; // => false
+    ```
+
+    It gets weirder:
+
+    ```js
+    const anotherObject = {
+    	someFunction: someObject.someFunction,
+    };
+
+    anotherObject.someFunction === someObject.someFunction; // => true
+    anotherObject.someFunction() === anotherObject; // => true
+    anotherObject.someFunction() === someObject; // => false
+    ```
+
+    So it amount to this: The exact same function can be called in two different ways, and you end up with two different contexts.
+
+    Let's investigate:
+
+    ```js
+    someObject.someFunction() === someObject; // => true
+    someObject['someFunction']() === someObject; // => true
+
+    const name = 'someFunction';
+
+    someObject[name]() === someObject; // => true
+    ```
+
+    Interesting!
+
+    ```js
+    let baz;
+
+    (baz = someObject.someFunction)() === this; // => true
+    ```
+
+    How about:
+
+    ```js
+    const arr = [someObject.someFunction];
+    arr[0]() === arr; // => true
+    ```
+
+    It seems that whether you use `a.b()` or `a['b']` or `a[n]` or `(a.b)()`, you get context `a`
+
+    ```js
+    const returnThis = function () {
+    	return this;
+    };
+
+    const aThirdObject = {
+    	someFunction() {
+    		return returnThis();
+    	},
+    };
+
+    returnThis() === this; // => true
+    aThirdObject.someFunction() === this; // => true
+    ```
+
+    And if you don't use `a.b()` or `a['b']` or `a[n]` or `(a.b)()`, you get the global environment for a context.
+
+-   setting your own context
+
+    Latter, we'll see that function have methods themselves, and one of them is `call`
+
+    ```js
+    returnThis() === aThirdObject; // => false
+    returnThis.call(aThirdObject) === aThirdObject; // => true
+    anotherObject.someFunction.call(someObject) === someObject; // => true
+    ```
+
+    Much hilarity can result from `call` shenanigans like this:
+
+    ```js
+    const a = [1, 2, 3],
+    	b = [4, 5, 6];
+
+    a.concat([2, 1]); // => [1,2,3,2,1]
+    a.concat.call(b, [2, 1]); // => [4,5,6,2,1]
+    ```
+
+    But now we thoroughly understand what `a.b()` really means: It's synonymous with `a.b.call(a)`. Whereas in a browser, `c()` is synonymous with `c.call(window)`
+
+-   arguments
+
+    JavsScript has another automagic binding in every function's environment. `arugments` is a special object that behaves a little like an array.
+
+    ```js
+    const third = function () {
+    	return arguments[2];
+    };
+    third(77, 76, 75, 74, 73); // => 75
+    ```
+
+-   application and contextualization
+
+    JavaScript also provides a fourth way to set the context for a function. `apply` .
+
+    ```js
+    third.apply(this, [1, 2, 3, 4, 5]); // => 3
+    ```
+
+    Another travesty
+
+    ```js
+    const a = [1, 2, 3],
+    	accrete = a.concat;
+    accrete([4, 5]); // => Uncaught TypeError: Array.prototype.concat called on null or undefined
+    ```
+
+    We get result of concatenating `[4,5]` onto an array containing the global environment. Not what we want! Behold:
+
+    ```js
+    const contextualize = (fn, context) => (...args) => fn.apply(context, args);
+
+    const accrete2 = contextualize(a.concat, a);
+    accrete2([4, 5]); // => [1,2,3,4,5]
+    ```
+
+    Consider:
+
+    ```js
+    var aFourthObject = {},
+    	returnThis = function () {
+    		return this;
+    	};
+
+    aFourthObject.uncontextualized = returnThis;
+    aFourthObject.contextualized = contextualize(returnThis, aFourthObject);
+    aFourthObject.uncontextualized() = aFourthObject; // => true
+    aFourthObject.contextualized() = aFourthObject; // => true
+    ```
+
+    Both are `true` because we are accessing them with `aFourthObject`. Now we write:
+
+    ```js
+    var uncontextualized = aFourthObject.uncontextualized,
+    	contextualized = aFourthObject.contextualized;
+
+    uncontextualized() === aFourthObject; // => false
+    contextualized() === aFourthObject; // => true
+    ```
+
+    without using `aFourthObject.`, only the contextualized version maintains the context of `aFourthObject`.
+
+p209
+
+-   Method Decorators
+
+    It a function is a verb, a decorator is an adverb.
+
+    Decorators can be used to decorate methods provided that they carefully preserve the function's context.
+
+    For example, here is a naive version of `maybe` for one argument:
+
+    ```js
+    const maybe = (fn) => (x) => (x != null ? fn(x) : x);
+    ```
+
+    We use it like this:
+
+    ```js
+    const plus1 = (x) => x + 1;
+
+    plus1(1); // => 2
+    plus1(0); // => 1
+    plus1(null); // => 1
+    plus1(undefined); // => null
+
+    const maybePlus1 = maybe(plus1);
+
+    maybePlus1(1); // => 2
+    maybePlus1(0); // => 1
+    maybePlus1(null); // => null
+    maybePlus1(undefined); // => undefined
+    ```
+
+    This version doesn't preserve the context, so it can't be used as a method decorator. Instead, we have to convert the decoration from a fat arrow to a `function` function:
+
+    ```js
+    const maybe = (fn) =>
+    	function (x) {
+    		return x != null ? fn(x) : x;
+    	};
+    ```
+
+    And then use `.call` to preserve `this`:
+
+    ```js
+    const maybe = (fn) =>
+    	function (x) {
+    		return x != null ? fn.call(this, x) : x;
+    	};
+    ```
+
+    We can also handle variadic functions and methods.
+
+    ```js
+    const maybe = (fn) =>
+    	function (...args) {
+    		for (const i in args) {
+    			if (args[i] == null) return args[i];
+    		}
+    		return fn.apply(this, args);
+    	};
+    ```
+
+    Now we can write things like:
+
+    ```js
+    const someObject = {
+    	setSize: maybe(function (size) {
+    		this.size = size;
+    	}),
+    };
+    ```
+
+    And `this` is correctly set:
+
+    ```js
+    someObject.setSize(5);
+    someObject; // => { setSize: [Function], size: 5 }
+
+    someObject.setSize(null);
+    someObject; // => { setSize: [Function], size: 5 }
+    ```
+
+    Using `.call` or `.apply` and `arguments` is substantially slower that writing function decorators that don't set context, but the default choice should be to write all function decorators in such a way that they are "context agnostic".
+
+---
+
+## Recipes with Obejects Mutations, and State
+
+p214
+
+-   Memoize
+
+    Consider:
+
+    ```js
+    const fibonacci = (n) => (n < 2 ? n : fibonacci(n - 2) + fibonacci(n - 1));
+
+    [0, 1, 2, 3, 4, 5, 6, 7, 8].map(fibonacci);
+    // => [0,1,1,2,3,5,8,13,21]
+    ```
+
+    We'll time it:
+
+    ```js
+    s = new Date().getTime();
+    fibonacci(45);
+    (new Date().getTime() - s) / 1000; // => 15.194
+    ```
+
+    Why is it so slow? Well, it has a nasty habit of recalculating the same results over and over and over agagin. We could reaarange the compuation to avoid this, but let's be lazy and trade space for time.
+
+    ```js
+    const memoized = (fn) => {
+    	const lookupTable = {};
+
+    	return function (...args) {
+    		const key = JSON.stringify.apply(this, args);
+
+    		return (
+    			lookupTable[key] || (lookupTable[key] = fn.apply(this, args))
+    		);
+    	};
+    };
+    ```
+
+    It only works for functions that are "idempotent".
+
+    Let's try it:
+
+    ```js
+    const fastFibonacci = memoized((n) =>
+    	n < 2 ? n : fastFibonacci(n - 2) + fastFibonacci(n - 1)
+    );
+
+    fastFibonacci(45); // => 1134903170
+    ```
+
+    We get the result back instantly. It works.
+
+    If you have another strategy for turning the arguments into a string key, we'll need to make a version that allows you to supply an optional `keymaker` function:
+
+    ```js
+    const memoized = (fn, keymaker = JSON.stringify) => {
+    	const lookupTable = {};
+
+    	return function (...args) {
+    		const key = keymaker.apply(this, args);
+
+    		return (
+    			lookupTable[key] || (lookupTable[key] = fn.apply(this, args))
+    		);
+    	};
+    };
+    ```
+
+-   memoizing recursive functions
+
+    we deliberately picked a recursive function to memoize, because it demonstrates a pitfall when combining decorators with named functional expression.
+
+    ```js
+    var fibonacci = function fibonacci(n) {
+    	if (n < 2) {
+    		return n;
+    	} else {
+    		return fibonacci(n - 2) + fibonacci(n - 1);
+    	}
+    };
+    ```
+
+    If we try to memoize it, we don't get the expected speedup:
+
+    ```js
+    var fibonacci = memoized(function fibonacci(n) {
+    	if (n < 2) {
+    		return n;
+    	} else {
+    		return fibonacci(n - 2) + fibonacci(n - 1);
+    	}
+    });
+    ```
+
+    That's because the function bound to the name `fibonacci` in the outer environment has been memoized, but the named functional expression binds the name `fibonacci` inside the unmemoized function, so none of the recursive calls to fibonacci are _ever_ memoized. Therefore we must write:
+
+    ```js
+    var fibonacci = memoized(function (n) {
+    	if (n < 2) {
+    		return n;
+    	} else {
+    		return fibonacci(n - 2) + fibonacci(n - 1);
+    	}
+    });
+    ```
+
+-   getWith
+
+    `getWith` is a very simple function:
+
+    ```js
+    const getWith = (attr) => (object) => object[attr];
+    ```
+
+    You can use it like this:
+
+    ```js
+    const inventory = {
+    	apples: 0,
+    	oranges: 144,
+    	eggs: 36,
+    };
+
+    getWith('oranges')(inventory); // => 144
+    ```
+
+    Let's combine it with `mapWith`
+
+    ```js
+    const inventories = [
+    	{apples: 0, oranges: 144, eggs: 36},
+    	{apples: 240, oranges: 54, eggs: 12},
+    	{apples: 24, oranges: 12, eggs: 42},
+    ];
+
+    mapWith(getWith('oranges'))(inventories);
+    // => [144, 54, 12]
+    ```
+
+    That's nicer than writing things out "longhand":
+
+    ```js
+    mapWith((inventory) => inventory.oranges)(inventories);
+    ```
+
+    `getWith` plays nicely with maybe as well. Consider a sparse array. You can use:
+
+    ```js
+    mapWith(maybe(getWith('oranges')));
+    ```
+
+    To get the orange count from all the non-null inventories in a list.
+
+-   what's in a name?
